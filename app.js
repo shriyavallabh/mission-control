@@ -89,14 +89,17 @@ window.addEventListener('hashchange', route);
 // ----------------------------------------------------------------------------
 // reconnecting websocket
 // ----------------------------------------------------------------------------
-function rws(pathWithToken, onMsg, onOpen) {
+// Token travels in the WebSocket subprotocol ("mc.<token>"), NEVER in the URL —
+// so it can't leak into server access logs, proxy logs, or browser history.
+function rws(path, onMsg, onOpen) {
   let ws, closed = false, delay = 600, timer;
   function open() {
-    ws = new WebSocket(wsBase() + pathWithToken);
-    ws.onopen = () => { delay = 600; onOpen && onOpen(ws); };
+    ws = new WebSocket(wsBase() + path, ['mc.' + LS.token]);
+    ws.onopen = () => { delay = 600; netBanner(false); onOpen && onOpen(ws); };
     ws.onmessage = (ev) => { try { onMsg(JSON.parse(ev.data)); } catch {} };
     ws.onclose = () => {
       if (closed) return;
+      netBanner(true);
       timer = setTimeout(open, delay);
       delay = Math.min(delay * 1.7, 8000);
     };
@@ -104,9 +107,20 @@ function rws(pathWithToken, onMsg, onOpen) {
   }
   open();
   return {
-    send: (o) => { try { ws.readyState === 1 && ws.send(JSON.stringify(o)); } catch {} },
+    send: (o) => {
+      if (ws && ws.readyState === 1) { try { ws.send(JSON.stringify(o)); return true; } catch { return false; } }
+      return false;
+    },
     close: () => { closed = true; clearTimeout(timer); try { ws.close(); } catch {} },
   };
+}
+let _bannerEl = null;
+function netBanner(show) {
+  if (show) {
+    if (_bannerEl) return;
+    _bannerEl = el('div', { class: 'banner warn' }, 'Reconnecting…');
+    app.prepend(_bannerEl);
+  } else if (_bannerEl) { _bannerEl.remove(); _bannerEl = null; }
 }
 
 // ----------------------------------------------------------------------------
@@ -197,7 +211,7 @@ function viewHome() {
   api('/api/sessions').then(d => paint(d.sessions)).catch(e => {
     list.innerHTML = ''; list.appendChild(el('div', { class: 'empty' }, el('h2', {}, 'Can’t reach backend'), el('p', {}, String(e.message || e))));
   });
-  const sock = rws('/api/events?token=' + encodeURIComponent(LS.token), (m) => { if (m.type === 'sessions') paint(m.sessions); });
+  const sock = rws('/api/events', (m) => { if (m.type === 'sessions') paint(m.sessions); });
   teardown = () => sock.close();
 }
 function statusLabel(s) { return { working: 'working…', idle: 'waiting for you', error: 'error', unknown: 'idle' }[s] || s; }
@@ -239,11 +253,17 @@ function viewSession(proj, win) {
     if (!text) return;
     ta.value = ''; autoGrow();
     appendOptimistic(text);
-    try { sock.send({ type: 'send', text, submit: true }); }
-    catch { api('/api/sessions/' + id + '/send', { method: 'POST', body: { text } }).catch(() => toast('send failed')); }
+    if (!sock.send({ type: 'send', text, submit: true })) {
+      // WS down — fall back to REST so the message is never silently dropped.
+      try { await api('/api/sessions/' + id + '/send', { method: 'POST', body: { text, submit: true } }); }
+      catch { toast('send failed (offline)'); }
+    }
   }
+  const pendingOpt = [];
   function appendOptimistic(text) {
-    feed.appendChild(el('div', { class: 'bubble user' }, text));
+    const node = el('div', { class: 'bubble user' }, text);
+    feed.appendChild(node);
+    pendingOpt.push({ text: text.trim(), node });
     if (atBottom) scroll.scrollTop = scroll.scrollHeight;
   }
 
@@ -279,13 +299,19 @@ function viewSession(proj, win) {
   function addEvent(e) {
     if (seen.has(e.seq)) return;
     seen.add(e.seq);
+    // Drop the optimistic bubble once its real transcript event arrives.
+    if (e.role === 'user' && e.kind === 'text') {
+      const t = (e.text || e.display || '').trim();
+      const i = pendingOpt.findIndex(o => o.text === t);
+      if (i !== -1) { pendingOpt[i].node.remove(); pendingOpt.splice(i, 1); }
+    }
     const node = renderEvent(e);
     if (node) { feed.appendChild(node); if (atBottom) scroll.scrollTop = scroll.scrollHeight; }
   }
 
-  const sock = rws('/api/stream/' + proj + '/' + win + '?token=' + encodeURIComponent(LS.token), (m) => {
+  const sock = rws('/api/stream/' + proj + '/' + win, (m) => {
     if (m.type === 'snapshot') {
-      feed.innerHTML = ''; seen.clear();
+      feed.innerHTML = ''; seen.clear(); pendingOpt.length = 0;
       for (const e of m.events) addEvent(e);
       setStatus(m.status);
       scroll.scrollTop = scroll.scrollHeight;
@@ -309,7 +335,11 @@ function renderEvent(e) {
   }
   if (e.kind === 'thinking') { return el('div', { class: 'think' }, '\u{1F4AD} ' + e.display); }
   if (e.kind === 'system') {
-    if (e.display.startsWith('PR #')) return el('div', { class: 'sys prlink' }, el('a', { href: e.text || '#', target: '_blank' }, e.display));
+    if (e.display.startsWith('PR #')) {
+      const u = e.text || '';
+      const safe = /^https?:\/\//i.test(u) ? u : '#';
+      return el('div', { class: 'sys prlink' }, el('a', { href: safe, target: '_blank', rel: 'noopener noreferrer' }, e.display));
+    }
     const err = /error/i.test(e.display);
     return el('div', { class: 'sys' + (err ? ' error' : '') }, e.display);
   }
@@ -359,11 +389,13 @@ async function openPalette(id, ta) {
 // ----------------------------------------------------------------------------
 // voice (mic)
 // ----------------------------------------------------------------------------
-let voiceEnabledCache = null;
+let _voiceCache = { val: null, ts: 0 };
 async function isVoiceEnabled() {
-  if (voiceEnabledCache !== null) return voiceEnabledCache;
-  try { const c = await api('/api/config'); voiceEnabledCache = !!c.voiceEnabled; } catch { voiceEnabledCache = false; }
-  return voiceEnabledCache;
+  const now = Date.now();
+  if (_voiceCache.val !== null && now - _voiceCache.ts < 60000) return _voiceCache.val;
+  try { const c = await api('/api/config'); _voiceCache = { val: !!c.voiceEnabled, ts: now }; }
+  catch { _voiceCache = { val: false, ts: now }; }
+  return _voiceCache.val;
 }
 function setupMic(btn, id, onText) {
   let rec = null, chunks = [], recording = false;
@@ -430,11 +462,11 @@ function viewSettings() {
         el('button', { class: 'btn secondary', onclick: testPush }, 'Send test notification'),
         el('button', { class: 'btn secondary', onclick: () => go('/setup') }, 'Change backend / token'),
         el('button', { class: 'btn danger', onclick: () => { localStorage.removeItem('mc_token'); go('/setup'); } }, 'Sign out'))));
-  Notification && (pushRow.lastChild.textContent = Notification.permission);
+  pushRow.lastChild.textContent = (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported';
 }
 async function enablePush() {
   try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return toast('push unsupported');
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') return toast('push unsupported');
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') return toast('permission denied');
     const cfg = await api('/api/config');

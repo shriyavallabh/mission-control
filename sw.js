@@ -1,5 +1,5 @@
 // Mission Control service worker — offline app shell + web push.
-const CACHE = 'mc-shell-v1';
+const CACHE = 'mc-shell-v2';
 const SHELL = ['./', './index.html', './app.js', './styles.css', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -14,19 +14,22 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
-  // Never cache API or websocket traffic — always go to network.
-  if (url.pathname.startsWith('/api/') || e.request.method !== 'GET') return;
-  // Cache-first for the app shell (same-origin static assets).
-  if (url.origin === self.location.origin) {
-    e.respondWith(
-      caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
-        return res;
-      }).catch(() => caches.match('./index.html')))
-    );
-  }
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;   // never touch cross-origin backend/API
+  if (url.pathname.startsWith('/api/')) return;        // never cache same-origin API
+  // Cache-first ONLY for shell assets; any other dynamic same-origin GET goes to network.
+  const isShell = req.mode === 'navigate' ||
+    ['document', 'script', 'style', 'image', 'font', 'manifest'].includes(req.destination);
+  if (!isShell) return;
+  e.respondWith(
+    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      const copy = res.clone();
+      caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+      return res;
+    }).catch(() => caches.match('./index.html')))
+  );
 });
 
 self.addEventListener('push', (e) => {
