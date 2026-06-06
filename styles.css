@@ -87,6 +87,12 @@ a { color: var(--accent-2); }
 .tcorner { color: var(--faint); }
 .tool-res.err .ttext { color: var(--error); }
 .think { color: var(--faint); font-style: italic; font-size: 0.84rem; }
+.thinking { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.88rem; padding: 2px 0; }
+.th-star { color: var(--accent); font-size: 0.9rem; animation: thpulse 1.1s ease-in-out infinite; }
+@keyframes thpulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.82); } }
+.th-word { font-weight: 600; color: var(--text); }
+.th-time { color: var(--faint); font-size: 0.8rem; }
+.ib-mic svg, .ib-send svg { display: block; }
 .sys { color: var(--faint); font-size: 0.8rem; text-align: center; padding: 2px; }
 .sys.error { color: var(--error); }
 .msg.asst code, .msg.user code { background: var(--surface-3); padding: 1px 5px; border-radius: 5px; font-family: ui-monospace, Menlo, monospace; font-size: 0.85em; }

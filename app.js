@@ -31,6 +31,9 @@ function el(tag, attrs = {}, ...kids) {
 let toastTimer;
 function toast(msg, ms = 2200) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms); }
 function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+// Codex-style thin line mic (inherits currentColor)
+const MIC_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>';
+const SEND_SVG = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/></svg>';
 
 // ---------------------------------------------------------------- markdown (safe subset)
 function mdToHtml(s) {
@@ -195,10 +198,26 @@ function viewSession(proj, win) {
   const log = el('div', { class: 'chatlog' });
   const empty = el('div', { class: 'chat-empty' }, el('div', { class: 'ce-icon' }, '✳'), el('div', { class: 'ce-text' }, 'Ask Claude anything — or type / for a command.'));
   const jump = el('button', { class: 'jump', hidden: 'true' }, '↓ latest');
-  const bodyScroll = el('div', { class: 'm-body scrollable chatscroll' }, empty, log, jump);
+  const thinking = el('div', { class: 'thinking', hidden: 'true' }, el('span', { class: 'th-star' }, '✻'), el('span', { class: 'th-word' }, 'Working'), el('span', { class: 'th-time' }, ''));
+  const bodyScroll = el('div', { class: 'm-body scrollable chatscroll' }, empty, log, thinking, jump);
   bodyScroll.addEventListener('scroll', () => { atBottom = bodyScroll.scrollHeight - bodyScroll.scrollTop - bodyScroll.clientHeight < 80; jump.hidden = atBottom; });
   jump.addEventListener('click', () => { bodyScroll.scrollTop = bodyScroll.scrollHeight; });
   const toBottom = () => { if (atBottom) bodyScroll.scrollTop = bodyScroll.scrollHeight; };
+  // "thinking" indicator while Claude works (like the extension's ✻ Ruminating…)
+  let thinkTimer = null, thinkStart = 0, thinkN = 0;
+  const WORDS = ['Thinking', 'Ruminating', 'Crunching', 'Percolating', 'Pondering', 'Noodling', 'Brewing', 'Cogitating', 'Working', 'Conjuring', 'Computing', 'Simmering', 'Mulling'];
+  const thWord = thinking.querySelector('.th-word'), thTime = thinking.querySelector('.th-time');
+  function setThinking(on) {
+    if (on) {
+      thinking.hidden = false;
+      if (!thinkTimer) {
+        thinkStart = Date.now(); thinkN = 0;
+        const tick = () => { if (thinkN % 3 === 0) thWord.textContent = WORDS[Math.floor(Math.random() * WORDS.length)]; const s = Math.round((Date.now() - thinkStart) / 1000); thTime.textContent = s > 1 ? ` (${s}s · esc to interrupt)` : ''; thinkN++; };
+        tick(); thinkTimer = setInterval(tick, 1000);
+      }
+      toBottom();
+    } else { thinking.hidden = true; if (thinkTimer) { clearInterval(thinkTimer); thinkTimer = null; } }
+  }
 
   const stopBtn = el('button', { class: 'stopbtn', title: 'Interrupt Claude (Esc)' }, '■ Stop');
   stopBtn.addEventListener('click', () => { if (!sock.send({ type: 'key', key: 'escape' })) api('/api/sessions/' + id + '/interrupt', { method: 'POST' }).catch(() => {}); toast('stop sent'); });
@@ -233,13 +252,14 @@ function viewSession(proj, win) {
     }
     if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) { e.preventDefault(); doSend(); }
   });
-  const micBtn = el('button', { class: 'ib-mic', title: 'Voice' }, '🎤');
-  const sendBtn = el('button', { class: 'ib-send', title: 'Send' }, '↑');
+  const micBtn = el('button', { class: 'ib-mic', title: 'Voice', html: MIC_SVG });
+  const sendBtn = el('button', { class: 'ib-send', title: 'Send', html: SEND_SVG });
   function doSend() {
     const text = ta.value.trim(); if (!text) return;
     ta.value = ''; autoGrow(); slashPop.hidden = true;
     if (!text.startsWith('/')) appendUser(text);  // slash commands echo back as "ran /cmd" — skip optimistic to avoid a ghost dup
     if (!sock.send({ type: 'send', text, submit: true })) api('/api/sessions/' + id + '/send', { method: 'POST', body: { text, submit: true } }).catch(() => toast('send failed'));
+    setThinking(true);  // instant feedback; status heartbeat keeps/clears it
   }
   sendBtn.addEventListener('click', doSend);
   setupMic(micBtn, id, (txt) => { if (txt) appendUser(txt); });
@@ -260,10 +280,11 @@ function viewSession(proj, win) {
   }
   setMain(header, bodyScroll, composer);
   const sock = rws('/api/stream/' + proj + '/' + win, (m) => {
-    if (m.type === 'snapshot') { log.innerHTML = ''; seen.clear(); pendingOpt.length = 0; empty.hidden = (m.events.length > 0); for (const e of m.events) addEvent(e); bodyScroll.scrollTop = bodyScroll.scrollHeight; }
+    if (m.type === 'snapshot') { log.innerHTML = ''; seen.clear(); pendingOpt.length = 0; empty.hidden = (m.events.length > 0); for (const e of m.events) addEvent(e); setThinking(m.status === 'working'); bodyScroll.scrollTop = bodyScroll.scrollHeight; }
     else if (m.type === 'event') addEvent(m.event);
+    else if (m.type === 'status') setThinking(m.status === 'working');
   });
-  mainTeardown = () => sock.close();
+  mainTeardown = () => { sock.close(); if (thinkTimer) clearInterval(thinkTimer); };
 }
 
 function renderEvent(e) {
