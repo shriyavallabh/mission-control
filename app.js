@@ -112,7 +112,7 @@ function ensureShell() {
   app.innerHTML = '';
   sideListEl = el('div', { class: 'side-list' });
   const sidebar = el('aside', { class: 'sidebar' },
-    el('div', { class: 'side-head' }, el('div', { class: 'side-brand' }, '✳ Mission Control'), el('button', { class: 'iconbtn', title: 'Settings', onclick: () => go('/settings') }, '⚙')),
+    el('div', { class: 'side-head' }, el('div', { class: 'side-brand', title: 'Home', onclick: () => { go('/'); closeDrawer(); } }, '✳ Mission Control'), el('button', { class: 'iconbtn', title: 'Settings', onclick: () => go('/settings') }, '⚙')),
     sideListEl,
     el('button', { class: 'browse-all', onclick: openBrowseAll }, '＋ Browse all projects'));
   const scrim = el('div', { class: 'scrim', onclick: closeDrawer });
@@ -135,6 +135,8 @@ function rollupStatus(t) { if (t.some(x => x.status === 'error')) return 'error'
 function refreshSidebar() {
   if (!sideListEl) return;
   sideListEl.innerHTML = '';
+  sideListEl.append(el('div', { class: 'side-home' + (curSel === null ? ' sel' : ''), onclick: () => { go('/'); closeDrawer(); } },
+    el('span', { class: 'sh-ico' }, '⌂'), el('span', {}, 'Active conversations')));
   const by = {}; for (const c of sideData.all) by[slug(c.name)] = c;
   if (!sideData.pinned.length) sideListEl.append(el('div', { class: 'side-empty' }, 'No pinned projects. Tap “Browse all”.'));
   for (const name of sideData.pinned) {

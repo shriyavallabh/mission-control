@@ -43,7 +43,12 @@ a { color: var(--accent-2); }
 .layout { flex: 1; display: flex; min-height: 0; }
 .sidebar { width: 270px; flex: none; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); min-height: 0; }
 .side-head { display: flex; align-items: center; gap: 8px; padding: calc(var(--safe-top) + 12px) 12px 10px; border-bottom: 1px solid var(--border); }
-.side-brand { flex: 1; font-weight: 650; font-size: 0.95rem; }
+.side-brand { flex: 1; font-weight: 650; font-size: 0.95rem; cursor: pointer; }
+.side-home { display: flex; align-items: center; gap: 9px; padding: 9px 8px; border-radius: 9px; cursor: pointer; font-size: 0.9rem; font-weight: 540; color: var(--text); margin-bottom: 4px; }
+.side-home:active { background: var(--surface-2); }
+.side-home.sel { background: var(--surface-2); color: var(--accent); }
+.sh-ico { color: var(--muted); width: 16px; text-align: center; }
+.side-home.sel .sh-ico { color: var(--accent); }
 .side-list { flex: 1; overflow-y: auto; padding: 6px; }
 .side-empty { color: var(--muted); font-size: 0.82rem; padding: 16px; text-align: center; line-height: 1.5; }
 .side-proj { margin-bottom: 2px; border-radius: 9px; }
