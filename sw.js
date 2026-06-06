@@ -1,5 +1,5 @@
 // Mission Control service worker — offline app shell + web push.
-const CACHE = 'mc-shell-v2';
+const CACHE = 'mc-shell-v5';
 const SHELL = ['./', './index.html', './app.js', './styles.css', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
