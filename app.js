@@ -55,6 +55,7 @@ const MODES = [
   { id: 'bypass', label: 'Bypass permissions', desc: 'Claude will not ask for approval before running potentially dangerous commands', ico: ICON.shield },
 ];
 function modeMeta(id) { return MODES.find(m => m.id === id) || MODES[4]; }
+const WORDS = ['Thinking', 'Ruminating', 'Crunching', 'Percolating', 'Pondering', 'Noodling', 'Brewing', 'Cogitating', 'Working', 'Conjuring', 'Computing', 'Simmering', 'Mulling'];
 
 // ---------------------------------------------------------------- markdown (safe subset)
 function mdToHtml(s) {
@@ -117,17 +118,18 @@ async function route() {
   if (path === '/setup') { destroyShell(); return viewSetup(params); }
   if (path === '/settings') { destroyShell(); return viewSettings(); }
   ensureShell();
-  if (path.startsWith('/s/')) { const [, , proj, win] = path.split('/'); curSel = proj + '/' + win; viewSession(proj, win); }
+  if (path.startsWith('/d/')) { const uuid = path.slice(3); curSel = 'desktop:' + uuid; viewDesktop(uuid); }
+  else if (path.startsWith('/s/')) { const [, , proj, win] = path.split('/'); curSel = proj + '/' + win; viewSession(proj, win); }
   else { curSel = null; viewHome(); }
   refreshSidebar();
 }
 window.addEventListener('hashchange', route);
 
 // ---------------------------------------------------------------- shell
-let shellBuilt = false, sideListEl = null, mainEl = null, eventsSock = null, curSel = null;
-const sideData = { pinned: [], all: [], sessions: [] };
+let shellBuilt = false, sideListEl = null, mainEl = null, eventsSock = null, curSel = null, desktopTimer = null;
+const sideData = { pinned: [], all: [], sessions: [], desktop: [] };
 const expanded = new Set();
-function destroyShell() { shellBuilt = false; sideListEl = mainEl = null; if (eventsSock) { eventsSock.close(); eventsSock = null; } }
+function destroyShell() { shellBuilt = false; sideListEl = mainEl = null; if (eventsSock) { eventsSock.close(); eventsSock = null; } if (desktopTimer) { clearInterval(desktopTimer); desktopTimer = null; } }
 function ensureShell() {
   if (shellBuilt) return;
   app.innerHTML = '';
@@ -141,7 +143,12 @@ function ensureShell() {
   app.append(el('div', { class: 'layout' }, sidebar, scrim, mainEl));
   shellBuilt = true;
   loadSidebar();
+  loadDesktop();
+  desktopTimer = setInterval(loadDesktop, 6000);
   eventsSock = rws('/api/events', (m) => { if (m.type === 'sessions') { sideData.sessions = m.sessions; refreshSidebar(); mainRepaint && mainRepaint(); } });
+}
+async function loadDesktop() {
+  try { const d = await api('/api/desktop-sessions'); sideData.desktop = d.sessions || []; refreshSidebar(); } catch {}
 }
 function setMain(...nodes) { if (!mainEl) return; mainEl.innerHTML = ''; for (const n of nodes) if (n) mainEl.append(n); }
 function openDrawer() { document.querySelector('.layout')?.classList.add('drawer-open'); }
@@ -155,6 +162,7 @@ function termsFor(ps) { return sideData.sessions.filter(s => s.project === ps).s
 function rollupStatus(t) { if (t.some(x => x.status === 'error')) return 'error'; if (t.some(x => x.status === 'idle')) return 'idle'; if (t.some(x => x.status === 'working')) return 'working'; return t.length ? 'unknown' : 'off'; }
 function refreshSidebar() {
   if (!sideListEl) return;
+  const _st = sideListEl.scrollTop;   // preserve scroll across the 6s rebuild
   sideListEl.innerHTML = '';
   sideListEl.append(el('div', { class: 'side-home' + (curSel === null ? ' sel' : ''), onclick: () => { go('/'); closeDrawer(); } },
     el('span', { class: 'sh-ico' }, '⌂'), el('span', {}, 'Active conversations')));
@@ -172,6 +180,16 @@ function refreshSidebar() {
     }
     sideListEl.append(row);
   }
+  if (sideData.desktop && sideData.desktop.length) {
+    sideListEl.append(el('div', { class: 'side-section' }, 'Desktop · Antigravity'));
+    for (const s of sideData.desktop) {
+      sideListEl.append(el('div', { class: 'side-desktop' + (curSel === 'desktop:' + s.uuid ? ' active' : ''), onclick: () => { go('/d/' + s.uuid); closeDrawer(); } },
+        el('span', { class: 'dot ' + s.status }),
+        el('span', { class: 'sd-text' }, el('span', { class: 'sd-proj' }, s.project), el('span', { class: 'sd-title' }, s.title)),
+        s.live ? el('span', { class: 'sd-live', title: 'running now' }, '●') : null));
+    }
+  }
+  sideListEl.scrollTop = _st;
 }
 async function openOrAddTerminal(name, cwd) {
   try { if (cwd) { try { await api('/api/projects', { method: 'POST', body: { name, cwd } }); } catch {} } const r = await api('/api/sessions', { method: 'POST', body: { project: name } }); await loadSidebar(); if (r.id) go('/s/' + r.id); closeDrawer(); }
@@ -228,7 +246,6 @@ function viewSession(proj, win) {
   const toBottom = () => { if (atBottom) bodyScroll.scrollTop = bodyScroll.scrollHeight; };
   // "thinking" indicator while Claude works (like the extension's ✻ Ruminating…)
   let thinkTimer = null, thinkStart = 0, thinkN = 0;
-  const WORDS = ['Thinking', 'Ruminating', 'Crunching', 'Percolating', 'Pondering', 'Noodling', 'Brewing', 'Cogitating', 'Working', 'Conjuring', 'Computing', 'Simmering', 'Mulling'];
   const thWord = thinking.querySelector('.th-word'), thTime = thinking.querySelector('.th-time');
   function setThinking(on) {
     if (on) {
@@ -309,6 +326,37 @@ function viewSession(proj, win) {
   setMain(header, bodyScroll, composer);
   const sock = rws('/api/stream/' + proj + '/' + win, (m) => {
     if (m.type === 'snapshot') { log.innerHTML = ''; seen.clear(); pendingOpt.length = 0; empty.hidden = (m.events.length > 0); for (const e of m.events) addEvent(e); setThinking(m.status === 'working'); bodyScroll.scrollTop = bodyScroll.scrollHeight; }
+    else if (m.type === 'event') addEvent(m.event);
+    else if (m.type === 'status') setThinking(m.status === 'working');
+  });
+  mainTeardown = () => { sock.close(); if (thinkTimer) clearInterval(thinkTimer); };
+}
+
+function viewDesktop(uuid) {
+  const seen = new Set(); let atBottom = true;
+  const log = el('div', { class: 'chatlog' });
+  const empty = el('div', { class: 'chat-empty' }, el('div', { class: 'ce-icon', html: CLAWD_SVG }), el('div', { class: 'ce-text' }, 'Loading this desktop conversation…'));
+  const jump = el('button', { class: 'jump', hidden: 'true' }, '↓ latest');
+  const thinking = el('div', { class: 'thinking', hidden: 'true' }, el('span', { class: 'th-star' }, '✻'), el('span', { class: 'th-word' }, 'Working'), el('span', { class: 'th-time' }, ''));
+  const bodyScroll = el('div', { class: 'm-body scrollable chatscroll' }, empty, log, thinking, jump);
+  bodyScroll.addEventListener('scroll', () => { atBottom = bodyScroll.scrollHeight - bodyScroll.scrollTop - bodyScroll.clientHeight < 80; jump.hidden = atBottom; });
+  jump.addEventListener('click', () => { bodyScroll.scrollTop = bodyScroll.scrollHeight; });
+  const toBottom = () => { if (atBottom) bodyScroll.scrollTop = bodyScroll.scrollHeight; };
+  let thinkTimer = null, thinkStart = 0, thinkN = 0;
+  const thWord = thinking.querySelector('.th-word'), thTime = thinking.querySelector('.th-time');
+  function setThinking(on) {
+    if (on) {
+      thinking.hidden = false;
+      if (!thinkTimer) { thinkStart = Date.now(); thinkN = 0; const tick = () => { if (thinkN % 3 === 0) thWord.textContent = WORDS[Math.floor(Math.random() * WORDS.length)]; const s = Math.round((Date.now() - thinkStart) / 1000); thTime.textContent = s > 1 ? ` (${s}s)` : ''; thinkN++; }; tick(); thinkTimer = setInterval(tick, 1000); }
+      toBottom();
+    } else { thinking.hidden = true; if (thinkTimer) { clearInterval(thinkTimer); thinkTimer = null; } }
+  }
+  const header = el('div', { class: 'm-head' }, el('button', { class: 'iconbtn ham', onclick: openDrawer }, '☰'), el('div', { class: 'm-title' }, el('span', { class: 'm-proj' }, 'Desktop'), el('span', { class: 'm-sub' }, 'Antigravity · live mirror')));
+  const banner = el('div', { class: 'viewonly' }, '👁  View-only — running in Antigravity on your desktop. (Use a tmux terminal to type from your phone.)');
+  function addEvent(e) { if (seen.has(e.seq)) return; seen.add(e.seq); empty.hidden = true; const node = renderEvent(e); if (node) { log.append(node); toBottom(); } }
+  setMain(header, bodyScroll, banner);
+  const sock = rws('/api/desktop/' + uuid, (m) => {
+    if (m.type === 'snapshot') { log.innerHTML = ''; seen.clear(); empty.hidden = (m.events.length > 0); if (!m.events.length) empty.querySelector('.ce-text').textContent = 'No messages yet in this conversation.'; for (const e of m.events) addEvent(e); setThinking(m.status === 'working'); bodyScroll.scrollTop = bodyScroll.scrollHeight; }
     else if (m.type === 'event') addEvent(m.event);
     else if (m.type === 'status') setThinking(m.status === 'working');
   });
