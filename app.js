@@ -34,6 +34,27 @@ function escapeHtml(s) { return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp
 // Codex-style thin line mic (inherits currentColor)
 const MIC_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/></svg>';
 const SEND_SVG = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/></svg>';
+// Exact "Clawd" mascot from the Claude Code extension (resources/clawd.svg)
+const CLAWD_SVG = '<svg viewBox="0 0 47 38" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.08191 10.0769V0.938461H9.37422V10.0769H5.08191ZM9.23305 10.0769V0.938461H13.5254V10.0769H9.23305ZM13.3842 10.0769V0.938461H17.6765V10.0769H13.3842ZM17.5353 10.0769V0.938461H21.8276V10.0769H17.5353ZM21.6865 10.0769V0.938461H25.9788V10.0769H21.6865ZM25.8376 10.0769V0.938461H30.1299V10.0769H25.8376ZM29.9888 10.0769V0.938461H34.2811V10.0769H29.9888ZM34.1399 10.0769V0.938461H38.4322V10.0769H34.1399ZM38.291 10.0769V0.938461H42.5834V10.0769H38.291ZM0.930769 19.0769V9.93846H5.22308V19.0769H0.930769ZM5.08191 19.0769V9.93846H9.37422V19.0769H5.08191ZM9.23305 19.0769V14.5077H13.5254V19.0769H9.23305ZM13.3842 19.0769V9.93846H17.6765V19.0769H13.3842ZM17.5353 19.0769V9.93846H21.8276V19.0769H17.5353ZM21.6865 19.0769V9.93846H25.9788V19.0769H21.6865ZM25.8376 19.0769V9.93846H30.1299V19.0769H25.8376ZM29.9888 19.0769V9.93846H34.2811V19.0769H29.9888ZM34.1399 19.0769V14.5077H38.4322V19.0769H34.1399ZM38.291 19.0769V9.93846H42.5834V19.0769H38.291ZM42.4422 19.0769V9.93846H46.7345V19.0769H42.4422ZM5.08191 28.0769V18.9385H9.37422V28.0769H5.08191ZM9.23305 28.0769V18.9385H13.5254V28.0769H9.23305ZM13.3842 28.0769V18.9385H17.6765V28.0769H13.3842ZM17.5353 28.0769V18.9385H21.8276V28.0769H17.5353ZM21.6865 28.0769V18.9385H25.9788V28.0769H21.6865ZM25.8376 28.0769V18.9385H30.1299V28.0769H25.8376ZM29.9888 28.0769V18.9385H34.2811V28.0769H29.9888ZM34.1399 28.0769V18.9385H38.4322V28.0769H34.1399ZM38.291 28.0769V18.9385H42.5834V28.0769H38.291ZM5.08191 37.0769V27.9385H9.37422V37.0769H5.08191ZM13.3842 37.0769V27.9385H17.6765V37.0769H13.3842ZM29.9888 37.0769V27.9385H34.2811V37.0769H29.9888ZM38.291 37.0769V27.9385H42.5834V37.0769H38.291Z" fill="#D97757"/></svg>';
+const _sv = (b) => '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + b + '</svg>';
+const ICON = {
+  up: _sv('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 8 12 3 17 8"/><line x1="12" y1="3" x2="12" y2="15"/>'),
+  doc: _sv('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>'),
+  globe: _sv('<circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18"/>'),
+  hand: _sv('<path d="M9 11V6a1.5 1.5 0 0 1 3 0v4"/><path d="M12 10V5a1.5 1.5 0 0 1 3 0v5"/><path d="M15 11V7a1.5 1.5 0 0 1 3 0v6a6 6 0 0 1-6 6h-1a6 6 0 0 1-4.2-1.7L4 15a1.6 1.6 0 0 1 2.3-2.2L8 14V8a1.5 1.5 0 0 1 3 0"/>'),
+  code: _sv('<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'),
+  plan: _sv('<rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/>'),
+  bolt: _sv('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
+  shield: _sv('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
+};
+const MODES = [
+  { id: 'ask', label: 'Ask before edits', desc: 'Claude will ask for approval before making each edit', ico: ICON.hand },
+  { id: 'editauto', label: 'Edit automatically', desc: 'Claude will edit your selected text or the whole file', ico: ICON.code },
+  { id: 'plan', label: 'Plan mode', desc: 'Claude will explore the code and present a plan before editing', ico: ICON.plan },
+  { id: 'auto', label: 'Auto mode', desc: 'Claude will automatically choose the best permission mode for each task', ico: ICON.bolt },
+  { id: 'bypass', label: 'Bypass permissions', desc: 'Claude will not ask for approval before running potentially dangerous commands', ico: ICON.shield },
+];
+function modeMeta(id) { return MODES.find(m => m.id === id) || MODES[4]; }
 
 // ---------------------------------------------------------------- markdown (safe subset)
 function mdToHtml(s) {
@@ -185,7 +206,7 @@ function viewHome() {
   function paint() {
     wrap.innerHTML = '';
     const live = sideData.sessions.slice().sort((a, b) => (b.lastActivityTs || 0) - (a.lastActivityTs || 0));
-    if (!live.length) { wrap.append(el('div', { class: 'chat-empty' }, el('div', { class: 'ce-icon' }, '✳'), el('div', { class: 'ce-text', html: 'Open a project from the left to start.<br>Your teammates can chat with Claude here — no terminal needed.' }))); return; }
+    if (!live.length) { wrap.append(el('div', { class: 'chat-empty' }, el('div', { class: 'ce-icon', html: CLAWD_SVG }), el('div', { class: 'ce-text', html: 'Open a project from the left to start.<br>Your teammates can chat with Claude here — no terminal needed.' }))); return; }
     wrap.append(el('div', { class: 'over-title' }, 'Active conversations'));
     const grid = el('div', { class: 'over-grid' });
     for (const s of live) grid.append(el('div', { class: 'over-card', onclick: () => go('/s/' + s.id) }, el('div', { class: 'oc-top' }, el('span', { class: 'dot ' + s.status }), el('span', { class: 'oc-name' }, s.project + ' #' + s.window)), el('div', { class: 'oc-last' }, s.lastEventDisplay || s.status)));
@@ -198,7 +219,7 @@ function viewHome() {
 function viewSession(proj, win) {
   const id = proj + '/' + win; const seen = new Set(); const pendingOpt = []; let atBottom = true;
   const log = el('div', { class: 'chatlog' });
-  const empty = el('div', { class: 'chat-empty' }, el('div', { class: 'ce-icon' }, '✳'), el('div', { class: 'ce-text' }, 'Ask Claude anything — or type / for a command.'));
+  const empty = el('div', { class: 'chat-empty' }, el('div', { class: 'ce-icon', html: CLAWD_SVG }), el('div', { class: 'ce-text' }, 'Ask Claude anything — or type / for a command.'));
   const jump = el('button', { class: 'jump', hidden: 'true' }, '↓ latest');
   const thinking = el('div', { class: 'thinking', hidden: 'true' }, el('span', { class: 'th-star' }, '✻'), el('span', { class: 'th-word' }, 'Working'), el('span', { class: 'th-time' }, ''));
   const bodyScroll = el('div', { class: 'm-body scrollable chatscroll' }, empty, log, thinking, jump);
@@ -223,7 +244,9 @@ function viewSession(proj, win) {
 
   const stopBtn = el('button', { class: 'stopbtn', title: 'Interrupt Claude (Esc)' }, '■ Stop');
   stopBtn.addEventListener('click', () => { if (!sock.send({ type: 'key', key: 'escape' })) api('/api/sessions/' + id + '/interrupt', { method: 'POST' }).catch(() => {}); toast('stop sent'); });
-  const header = el('div', { class: 'm-head' }, el('button', { class: 'iconbtn ham', onclick: openDrawer }, '☰'), el('div', { class: 'm-title' }, el('span', { class: 'm-proj' }, proj), el('span', { class: 'm-sub' }, '#' + win)), stopBtn);
+  const moreBtn = el('button', { class: 'iconbtn', title: 'Actions' }, '⋯');
+  moreBtn.addEventListener('click', () => openActions(id, sock, ta));
+  const header = el('div', { class: 'm-head' }, el('button', { class: 'iconbtn ham', onclick: openDrawer }, '☰'), el('div', { class: 'm-title' }, el('span', { class: 'm-proj' }, proj), el('span', { class: 'm-sub' }, '#' + win)), stopBtn, moreBtn);
 
   // ---- input (Claude-extension style) + slash autocomplete ----
   const ta = el('textarea', { rows: 1, placeholder: 'Reply to Claude…   (type / for commands)' });
@@ -265,14 +288,17 @@ function viewSession(proj, win) {
   }
   sendBtn.addEventListener('click', doSend);
   setupMic(micBtn, id, (txt) => { if (txt) appendUser(txt); });
-  const plusBtn = el('button', { class: 'ib-btn', title: 'Actions' }, '＋'); plusBtn.addEventListener('click', () => openActions(id, sock, ta));
+  const plusBtn = el('button', { class: 'ib-btn', title: 'Add' }, '＋'); plusBtn.addEventListener('click', () => openPlus(id, ta));
   const slashBtn = el('button', { class: 'ib-btn', title: 'Slash command' }, '/'); slashBtn.addEventListener('click', () => { if (!ta.value.startsWith('/')) ta.value = '/' + ta.value; ta.focus(); updateSlash(); });
+  const permChip = el('button', { class: 'perm-chip' }); setChip(permChip, 'bypass');
+  permChip.addEventListener('click', () => openModes(id, permChip));
+  api('/api/sessions/' + id + '/mode').then(d => setChip(permChip, d.mode || 'bypass')).catch(() => {});
   const composer = el('div', { class: 'composer' }, slashPop,
     el('div', { class: 'inputbox' },
       el('div', { class: 'ib-top' }, ta, micBtn),
       el('div', { class: 'ib-bar' },
         el('div', { class: 'ib-left' }, plusBtn, slashBtn),
-        el('div', { class: 'ib-right' }, el('span', { class: 'perm-chip', title: 'Sessions run with bypass permissions' }, '⤳ Bypass permissions'), sendBtn))));
+        el('div', { class: 'ib-right' }, permChip, sendBtn))));
 
   function appendUser(text) { empty.hidden = true; const node = el('div', { class: 'msg user' }, el('div', { class: 'msg-label' }, LS.name || 'You'), el('div', { class: 'msg-body', html: mdToHtml(text) })); log.append(node); pendingOpt.push({ text: text.trim(), node }); toBottom(); }
   function addEvent(e) {
@@ -287,6 +313,59 @@ function viewSession(proj, win) {
     else if (m.type === 'status') setThinking(m.status === 'working');
   });
   mainTeardown = () => { sock.close(); if (thinkTimer) clearInterval(thinkTimer); };
+}
+
+function setChip(chipEl, modeId) {
+  const m = modeMeta(modeId);
+  chipEl.dataset.mode = m.id;
+  chipEl.innerHTML = '<span class="pc-ico">' + m.ico + '</span><span class="pc-label">' + escapeHtml(m.label) + '</span><span class="pc-caret">▾</span>';
+}
+
+function openModes(id, chipEl) {
+  const cur = chipEl.dataset.mode || 'bypass';
+  const bd = el('div', { class: 'sheet-backdrop' }); bd.addEventListener('click', e => { if (e.target === bd) bd.remove(); });
+  const list = el('div', { class: 'more-list' });
+  MODES.forEach(m => {
+    list.append(el('button', {
+      class: 'mode-item' + (m.id === cur ? ' on' : ''),
+      onclick: async () => {
+        bd.remove(); toast('switching to ' + m.label + '…', 4000);
+        try {
+          const r = await api('/api/sessions/' + id + '/set-mode', { method: 'POST', body: { mode: m.id } });
+          setChip(chipEl, r.mode);
+          toast(r.reached ? ('Mode: ' + modeMeta(r.mode).label) : ('Couldn’t switch — still ' + modeMeta(r.mode).label), 3500);
+        } catch { toast('mode switch failed'); }
+      }
+    }, el('span', { class: 'mi-ico', html: m.ico }),
+      el('span', { class: 'mi-text' }, el('span', { class: 'mi-title' }, m.label), el('span', { class: 'mi-desc' }, m.desc)),
+      m.id === cur ? el('span', { class: 'mi-check' }, '✓') : null));
+  });
+  bd.append(el('div', { class: 'sheet' }, el('div', { class: 'sheet-grip' }),
+    el('div', { class: 'modes-head' }, el('span', {}, 'Modes'), el('span', { class: 'modes-hint' }, '⇧+tab to switch')), list));
+  document.body.append(bd);
+}
+
+function openPlus(id, ta) {
+  const bd = el('div', { class: 'sheet-backdrop' }); bd.addEventListener('click', e => { if (e.target === bd) bd.remove(); });
+  const item = (ico, label, fn) => el('button', { class: 'plus-item', onclick: () => { bd.remove(); fn(); } }, el('span', { class: 'pi-ico', html: ico }), el('span', {}, label));
+  bd.append(el('div', { class: 'sheet' }, el('div', { class: 'sheet-grip' }),
+    el('div', { class: 'more-list' },
+      item(ICON.up, 'Upload from computer', () => pickAndUpload(id, ta, '')),
+      item(ICON.doc, 'Add context', () => pickAndUpload(id, ta, 'Context file: ')),
+      item(ICON.globe, 'Browse the web', () => { ta.value = (ta.value ? ta.value + ' ' : '') + 'Search the web for '; ta.focus(); }))));
+  document.body.append(bd);
+}
+
+function pickAndUpload(id, ta, prefix) {
+  const inp = el('input', { type: 'file' });
+  inp.addEventListener('change', async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    toast('uploading ' + f.name + '…', 5000);
+    const fd = new FormData(); fd.append('file', f, f.name);
+    try { const d = await api('/api/sessions/' + id + '/upload', { method: 'POST', body: fd }); ta.value = (ta.value ? ta.value + ' ' : '') + (prefix || '') + d.path + ' '; ta.focus(); toast('attached ' + d.name); }
+    catch { toast('upload failed'); }
+  });
+  inp.click();
 }
 
 function renderEvent(e) {
